@@ -59,22 +59,22 @@ Swagger UI: <http://localhost:8080/swagger/index.html>
 
 ## API
 
-| Method   | Path                            | Store(s)                     | Purpose |
-| -------- | ------------------------------- | ---------------------------- | ------- |
-| `GET`    | `/healthz`                      | –                            | Liveness |
-| `GET`    | `/readyz`                       | PG + Mongo + Redis           | Readiness with per-dependency errors |
-| `GET`    | `/swagger/index.html`           | generated                    | Swagger UI |
-| `GET`    | `/api/v1/tasks`                 | PostgreSQL                   | List/filter tasks |
-| `POST`   | `/api/v1/tasks`                 | PG + Redis + Mongo           | Create task, cache it, audit it |
-| `GET`    | `/api/v1/tasks/{id}`            | Redis → PostgreSQL           | Cache-aside read |
-| `PATCH`  | `/api/v1/tasks/{id}`            | PG + Redis + Mongo           | Partial update, refresh cache, audit |
-| `DELETE` | `/api/v1/tasks/{id}`            | PG + Redis + Mongo           | Delete, invalidate cache, audit |
-| `GET`    | `/api/v1/tasks/{id}/overview`   | PG (via Redis) + Mongo + Redis | Cross-database aggregate |
-| `GET`    | `/api/v1/notes`                 | MongoDB                      | List/filter notes |
-| `POST`   | `/api/v1/notes`                 | MongoDB                      | Create note |
-| `GET`    | `/api/v1/notes/{id}`            | MongoDB                      | Get note |
-| `PATCH`  | `/api/v1/notes/{id}`            | MongoDB                      | Partial update |
-| `DELETE` | `/api/v1/notes/{id}`            | MongoDB                      | Delete note |
+| Method   | Path                          | Store(s)                       | Purpose                              |
+| -------- | ----------------------------- | ------------------------------ | ------------------------------------ |
+| `GET`    | `/healthz`                    | –                              | Liveness                             |
+| `GET`    | `/readyz`                     | PG + Mongo + Redis             | Readiness with per-dependency errors |
+| `GET`    | `/swagger/index.html`         | generated                      | Swagger UI                           |
+| `GET`    | `/api/v1/tasks`               | PostgreSQL                     | List/filter tasks                    |
+| `POST`   | `/api/v1/tasks`               | PG + Redis + Mongo             | Create task, cache it, audit it      |
+| `GET`    | `/api/v1/tasks/{id}`          | Redis → PostgreSQL             | Cache-aside read                     |
+| `PATCH`  | `/api/v1/tasks/{id}`          | PG + Redis + Mongo             | Partial update, refresh cache, audit |
+| `DELETE` | `/api/v1/tasks/{id}`          | PG + Redis + Mongo             | Delete, invalidate cache, audit      |
+| `GET`    | `/api/v1/tasks/{id}/overview` | PG (via Redis) + Mongo + Redis | Cross-database aggregate             |
+| `GET`    | `/api/v1/notes`               | MongoDB                        | List/filter notes                    |
+| `POST`   | `/api/v1/notes`               | MongoDB                        | Create note                          |
+| `GET`    | `/api/v1/notes/{id}`          | MongoDB                        | Get note                             |
+| `PATCH`  | `/api/v1/notes/{id}`          | MongoDB                        | Partial update                       |
+| `DELETE` | `/api/v1/notes/{id}`          | MongoDB                        | Delete note                          |
 
 Every success response wraps its payload in `{"data": ...}`. Errors look like:
 
@@ -140,7 +140,7 @@ curl -sS http://localhost:8080/api/v1/tasks/TASK_ID/overview
   "data": {
     "task": { "...": "from PostgreSQL (through Redis)" },
     "notes_count": 2,
-    "recent_notes": [ { "...": "from MongoDB" } ],
+    "recent_notes": [{ "...": "from MongoDB" }],
     "view_count": 42,
     "week_label": "2026-W43",
     "generated_at": "2026-10-19T12:00:00Z",
@@ -171,15 +171,15 @@ idiomatic and this project implements it explicitly in
 Dates are the messiest part of most APIs, so the project centralizes them in
 `internal/platform/dates`:
 
-| Concern | Choice |
-| --- | --- |
-| Flexible input | `github.com/araddon/dateparse` accepts ISO dates, RFC3339, and common regional formats. |
+| Concern                 | Choice                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| Flexible input          | `github.com/araddon/dateparse` accepts ISO dates, RFC3339, and common regional formats.   |
 | Timezone interpretation | `time.LoadLocation` + `dateparse.ParseIn`; date-only values use the request's `timezone`. |
-| Storage | Always UTC (`time.Time` → `TIMESTAMPTZ` / BSON date). |
-| Calendar math | `StartOfDay`, `EndOfDay`, `DaysUntil`, `AddBusinessDays` (skips weekends). |
-| Human output | `github.com/dustin/go-humanize` produces phrases such as `in 3 days`. |
-| Grouping | `time.ISOWeek` produces labels such as `2026-W43`. |
-| Clearing a deadline | `"clear_due_date": true` on PATCH. |
+| Storage                 | Always UTC (`time.Time` → `TIMESTAMPTZ` / BSON date).                                     |
+| Calendar math           | `StartOfDay`, `EndOfDay`, `DaysUntil`, `AddBusinessDays` (skips weekends).                |
+| Human output            | `github.com/dustin/go-humanize` produces phrases such as `in 3 days`.                     |
+| Grouping                | `time.ISOWeek` produces labels such as `2026-W43`.                                        |
+| Clearing a deadline     | `"clear_due_date": true` on PATCH.                                                        |
 
 Seed data uses business-day math, and one seeded task is intentionally overdue so
 `is_overdue` and `due_date_human` are easy to see.
@@ -218,10 +218,10 @@ REDIS_ADDR=127.0.0.1:1 HTTP_ADDR=:8081 make run
 
 Two artifacts serve different purposes:
 
-| Artifact | Generated? | Use |
-| --- | --- | --- |
-| `docs/swagger/swagger.json` / `.yaml` | **Yes**, `swag` reads handler annotations | Live Swagger UI and client discovery |
-| `api/openapi.yaml` | Hand-maintained OpenAPI 3 contract | Reviewable source for client generation |
+| Artifact                              | Generated?                                | Use                                     |
+| ------------------------------------- | ----------------------------------------- | --------------------------------------- |
+| `docs/swagger/swagger.json` / `.yaml` | **Yes**, `swag` reads handler annotations | Live Swagger UI and client discovery    |
+| `api/openapi.yaml`                    | Hand-maintained OpenAPI 3 contract        | Reviewable source for client generation |
 
 Regenerate after changing a handler, DTO, or annotation:
 
@@ -238,12 +238,12 @@ first.
 
 The project writes only to isolated namespaces:
 
-| Store | Namespace | Contents |
-| --- | --- | --- |
-| PostgreSQL | schema `taskflow` | `tasks` table |
-| PostgreSQL | default schema | `goose_db_version` (migration metadata only) |
-| MongoDB | database `taskflow` | `notes`, `task_events` collections |
-| Redis | keys `taskflow:*` | task cache + view counters |
+| Store      | Namespace           | Contents                                     |
+| ---------- | ------------------- | -------------------------------------------- |
+| PostgreSQL | schema `taskflow`   | `tasks` table                                |
+| PostgreSQL | default schema      | `goose_db_version` (migration metadata only) |
+| MongoDB    | database `taskflow` | `notes`, `task_events` collections           |
+| Redis      | keys `taskflow:*`   | task cache + view counters                   |
 
 The existing `sample_mflix` MongoDB database and the rest of the PostgreSQL
 cluster are never modified.
@@ -296,36 +296,36 @@ cluster are never modified.
 `config.Load()` loads `.env` (if present) with `godotenv`, then reads real
 environment variables. Shell/container variables win over the file.
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `APP_ENV` | `development` | Environment label |
-| `HTTP_ADDR` | `:8080` | Listen address |
-| `HTTP_READ_HEADER_TIMEOUT` | `5s` | Slow-header protection |
-| `HTTP_READ_TIMEOUT` | `10s` | Whole-request read timeout |
-| `HTTP_WRITE_TIMEOUT` | `15s` | Response write timeout |
-| `HTTP_IDLE_TIMEOUT` | `60s` | Keep-alive idle timeout |
-| `SHUTDOWN_TIMEOUT` | `10s` | Graceful drain deadline |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `LOG_FORMAT` | `text` | `text` or `json` |
-| `POSTGRES_URL` | required | PostgreSQL connection string |
-| `POSTGRES_SCHEMA` | `taskflow` | Schema owned by the project (bundled migration supports `taskflow`) |
-| `MONGO_URI` | required | MongoDB connection string |
-| `MONGO_DATABASE` | `taskflow` | Database owned by the project |
-| `MONGO_CONNECT_TIMEOUT` | `10s` | Server selection timeout |
-| `REDIS_ADDR` | required | `host:port` |
-| `REDIS_USERNAME` | empty | Redis ACL username |
-| `REDIS_PASSWORD` | empty | Redis ACL password |
-| `REDIS_DB` | `0` | Logical database |
-| `REDIS_DIAL_TIMEOUT` | `5s` | TCP connect timeout |
-| `REDIS_READ_TIMEOUT` | `3s` | Socket read timeout |
-| `REDIS_WRITE_TIMEOUT` | `3s` | Socket write timeout |
-| `DB_CONNECT_ATTEMPTS` | `5` | Startup attempts per dependency |
-| `DB_CONNECT_RETRY_DELAY` | `2s` | Delay between startup attempts |
-| `REDIS_RETRY_ATTEMPTS` | `4` | Attempts per Redis command |
-| `REDIS_RETRY_DELAY` | `250ms` | Delay between command attempts |
-| `CACHE_TTL` | `5m` | Task cache TTL |
-| `AUTO_MIGRATE` | `true` | Run PostgreSQL/MongoDB setup at startup |
-| `SEED_DEMO_DATA` | `true` | Insert demo data when the task table is empty |
+| Variable                   | Default       | Meaning                                                             |
+| -------------------------- | ------------- | ------------------------------------------------------------------- |
+| `APP_ENV`                  | `development` | Environment label                                                   |
+| `HTTP_ADDR`                | `:8080`       | Listen address                                                      |
+| `HTTP_READ_HEADER_TIMEOUT` | `5s`          | Slow-header protection                                              |
+| `HTTP_READ_TIMEOUT`        | `10s`         | Whole-request read timeout                                          |
+| `HTTP_WRITE_TIMEOUT`       | `15s`         | Response write timeout                                              |
+| `HTTP_IDLE_TIMEOUT`        | `60s`         | Keep-alive idle timeout                                             |
+| `SHUTDOWN_TIMEOUT`         | `10s`         | Graceful drain deadline                                             |
+| `LOG_LEVEL`                | `info`        | `debug`, `info`, `warn`, `error`                                    |
+| `LOG_FORMAT`               | `text`        | `text` or `json`                                                    |
+| `POSTGRES_URL`             | required      | PostgreSQL connection string                                        |
+| `POSTGRES_SCHEMA`          | `taskflow`    | Schema owned by the project (bundled migration supports `taskflow`) |
+| `MONGO_URI`                | required      | MongoDB connection string                                           |
+| `MONGO_DATABASE`           | `taskflow`    | Database owned by the project                                       |
+| `MONGO_CONNECT_TIMEOUT`    | `10s`         | Server selection timeout                                            |
+| `REDIS_ADDR`               | required      | `host:port`                                                         |
+| `REDIS_USERNAME`           | empty         | Redis ACL username                                                  |
+| `REDIS_PASSWORD`           | empty         | Redis ACL password                                                  |
+| `REDIS_DB`                 | `0`           | Logical database                                                    |
+| `REDIS_DIAL_TIMEOUT`       | `5s`          | TCP connect timeout                                                 |
+| `REDIS_READ_TIMEOUT`       | `3s`          | Socket read timeout                                                 |
+| `REDIS_WRITE_TIMEOUT`      | `3s`          | Socket write timeout                                                |
+| `DB_CONNECT_ATTEMPTS`      | `5`           | Startup attempts per dependency                                     |
+| `DB_CONNECT_RETRY_DELAY`   | `2s`          | Delay between startup attempts                                      |
+| `REDIS_RETRY_ATTEMPTS`     | `4`           | Attempts per Redis command                                          |
+| `REDIS_RETRY_DELAY`        | `250ms`       | Delay between command attempts                                      |
+| `CACHE_TTL`                | `5m`          | Task cache TTL                                                      |
+| `AUTO_MIGRATE`             | `true`        | Run PostgreSQL/MongoDB setup at startup                             |
+| `SEED_DEMO_DATA`           | `true`        | Insert demo data when the task table is empty                       |
 
 Invalid values fail fast at startup with the variable name in the error.
 
@@ -343,6 +343,14 @@ make smoke         # full CRUD across PostgreSQL, MongoDB, Redis
 make tidy          # keep go.mod/go.sum consistent
 make docker-build  # build the container image
 ```
+
+To decrypt `.env`
+
+```bash
+gpg -o .env -d .env.gpg
+```
+
+remember the catchphrase
 
 ## Testing
 

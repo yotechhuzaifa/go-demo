@@ -8,6 +8,7 @@
 # Local environment files can contain machine-specific settings or secrets.
 .env
 .env.*
+!.env.gpg
 !.env.example
 configs/local.env
 *.local.env

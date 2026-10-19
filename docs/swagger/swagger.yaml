@@ -1,0 +1,689 @@
+basePath: /
+definitions:
+  example_com_taskflow_internal_transport_httpapi_dto.CreateNoteRequest:
+    properties:
+      author:
+        example: yotech
+        maxLength: 100
+        type: string
+      body:
+        example: Follow up with the client on Monday.
+        maxLength: 5000
+        type: string
+      tags:
+        example:
+        - follow-up
+        - client
+        items:
+          type: string
+        maxItems: 10
+        type: array
+      task_id:
+        example: 4f4c0f4e-6b1a-4e2f-9c3d-2a1b0c9d8e7f
+        type: string
+    required:
+    - body
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.CreateTaskRequest:
+    properties:
+      description:
+        example: Generate Swagger and verify the contract
+        maxLength: 2000
+        type: string
+      due_date:
+        description: |-
+          DueDate accepts an ISO date, RFC3339 timestamp, or a flexible format
+          understood by araddon/dateparse. Date-only values are interpreted in
+          Timezone (default UTC).
+        example: "2026-12-31"
+        type: string
+      priority:
+        enum:
+        - low
+        - medium
+        - high
+        example: high
+        type: string
+      timezone:
+        example: Asia/Karachi
+        type: string
+      title:
+        example: Write the API documentation
+        maxLength: 200
+        type: string
+    required:
+    - title
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.DependencyHealth:
+    properties:
+      error:
+        type: string
+      latency_ms:
+        example: 1.42
+        type: number
+      status:
+        example: ok
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.ErrorDetail:
+    properties:
+      code:
+        example: not_found
+        type: string
+      message:
+        example: the requested task does not exist
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorDetail'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.HealthResponse:
+    properties:
+      dependencies:
+        additionalProperties:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.DependencyHealth'
+        type: object
+      environment:
+        example: development
+        type: string
+      service:
+        example: taskflow
+        type: string
+      status:
+        example: ok
+        type: string
+      time:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.Note:
+    properties:
+      author:
+        example: yotech
+        type: string
+      body:
+        example: Follow up with the client on Monday.
+        type: string
+      created_at:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+      id:
+        example: 0b0a4f9e-3d3e-4a90-8b5c-6d7e8f9a0b1c
+        type: string
+      tags:
+        example:
+        - follow-up
+        - client
+        items:
+          type: string
+        type: array
+      task_id:
+        example: 4f4c0f4e-6b1a-4e2f-9c3d-2a1b0c9d8e7f
+        type: string
+      updated_at:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.NoteListMeta:
+    properties:
+      count:
+        example: 3
+        type: integer
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.NoteListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Note'
+        type: array
+      meta:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.NoteListMeta'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.NoteResponse:
+    properties:
+      data:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Note'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.OverviewEnvelope:
+    properties:
+      data:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.OverviewResponse'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.OverviewResponse:
+    properties:
+      generated_at:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+      notes_count:
+        example: 2
+        type: integer
+      recent_notes:
+        items:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Note'
+        type: array
+      sources:
+        example:
+        - postgresql
+        - mongodb
+        - redis
+        items:
+          type: string
+        type: array
+      task:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Task'
+      view_count:
+        example: 42
+        type: integer
+      week_label:
+        example: 2026-W43
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.Task:
+    properties:
+      created_at:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+      days_until_due:
+        example: 73
+        type: integer
+      description:
+        example: Generate Swagger and verify the contract
+        type: string
+      due_date:
+        example: "2026-12-31T00:00:00Z"
+        type: string
+      due_date_human:
+        description: Computed date descriptions. They are not stored and change as
+          time passes.
+        example: in 2 months
+        type: string
+      due_week:
+        example: 2026-W53
+        type: string
+      id:
+        example: 4f4c0f4e-6b1a-4e2f-9c3d-2a1b0c9d8e7f
+        type: string
+      is_overdue:
+        example: false
+        type: boolean
+      priority:
+        example: high
+        type: string
+      status:
+        example: todo
+        type: string
+      title:
+        example: Write the API documentation
+        type: string
+      updated_at:
+        example: "2026-10-19T12:00:00Z"
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.TaskListMeta:
+    properties:
+      count:
+        example: 3
+        type: integer
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.TaskListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Task'
+        type: array
+      meta:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.TaskListMeta'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.TaskResponse:
+    properties:
+      data:
+        $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.Task'
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.UpdateNoteRequest:
+    properties:
+      author:
+        maxLength: 100
+        type: string
+      body:
+        maxLength: 5000
+        minLength: 1
+        type: string
+      tags:
+        items:
+          type: string
+        maxItems: 10
+        type: array
+      task_id:
+        type: string
+    type: object
+  example_com_taskflow_internal_transport_httpapi_dto.UpdateTaskRequest:
+    properties:
+      clear_due_date:
+        type: boolean
+      description:
+        maxLength: 2000
+        type: string
+      due_date:
+        type: string
+      priority:
+        enum:
+        - low
+        - medium
+        - high
+        type: string
+      status:
+        enum:
+        - todo
+        - in_progress
+        - done
+        type: string
+      timezone:
+        type: string
+      title:
+        maxLength: 200
+        minLength: 1
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: Taskflow maintainers
+  description: |-
+    A verbose, production-shaped Go service demonstrating PostgreSQL, MongoDB, Redis, DTO validation, retry handling, and automated Swagger generation.
+
+    Every task write goes to PostgreSQL, refreshes Redis, and appends an audit document to MongoDB. The overview endpoint reads all three stores in one request.
+  title: Taskflow API
+  version: "1.0"
+paths:
+  /api/v1/notes:
+    get:
+      description: Returns notes newest first. Optionally filter by task_id.
+      parameters:
+      - description: Only notes attached to this task UUID
+        in: query
+        name: task_id
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Number of notes to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.NoteListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: List notes
+      tags:
+      - Notes
+    post:
+      consumes:
+      - application/json
+      description: Inserts a note document into MongoDB.
+      parameters:
+      - description: Note to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.CreateNoteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.NoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Create a note
+      tags:
+      - Notes
+  /api/v1/notes/{id}:
+    delete:
+      parameters:
+      - description: Note UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Note deleted; no body is returned
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Delete a note
+      tags:
+      - Notes
+    get:
+      parameters:
+      - description: Note UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.NoteResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Get one note
+      tags:
+      - Notes
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Note UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.UpdateNoteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.NoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Partially update a note
+      tags:
+      - Notes
+  /api/v1/tasks:
+    get:
+      description: Returns newest tasks first. PostgreSQL is queried directly; the
+        listing bypasses the cache.
+      parameters:
+      - description: Filter by workflow state
+        enum:
+        - todo
+        - in_progress
+        - done
+        in: query
+        name: status
+        type: string
+      - description: Filter by priority
+        enum:
+        - low
+        - medium
+        - high
+        in: query
+        name: priority
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Number of matching tasks to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.TaskListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: List tasks
+      tags:
+      - Tasks
+    post:
+      consumes:
+      - application/json
+      description: Validates the DTO, writes PostgreSQL, caches the task in Redis,
+        and appends an audit event to MongoDB. Cache and audit failures are logged
+        but do not roll back the committed task.
+      parameters:
+      - description: Task to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Create a task
+      tags:
+      - Tasks
+  /api/v1/tasks/{id}:
+    delete:
+      description: Deletes the PostgreSQL row, invalidates Redis, and records a MongoDB
+        audit event.
+      parameters:
+      - description: Task UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Task deleted; no body is returned
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Delete a task
+      tags:
+      - Tasks
+    get:
+      description: Reads through Redis first, then PostgreSQL on a cache miss.
+      parameters:
+      - description: Task UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.TaskResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Get one task
+      tags:
+      - Tasks
+    patch:
+      consumes:
+      - application/json
+      description: Only supplied fields change. Updating refreshes the Redis cache
+        and appends a MongoDB audit event.
+      parameters:
+      - description: Task UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.UpdateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Partially update a task
+      tags:
+      - Tasks
+  /api/v1/tasks/{id}/overview:
+    get:
+      description: 'The one endpoint that intentionally reads all three stores: the
+        task from PostgreSQL (through Redis), notes from MongoDB, and the view counter
+        from Redis.'
+      parameters:
+      - description: Task UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.OverviewEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.ErrorResponse'
+      summary: Cross-database task overview
+      tags:
+      - Overview
+  /healthz:
+    get:
+      description: Answers whether the process is running. It does not touch external
+        dependencies.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.HealthResponse'
+      summary: Liveness probe
+      tags:
+      - Health
+  /readyz:
+    get:
+      description: Pings PostgreSQL, MongoDB, and Redis. Returns 503 with the concrete
+        error for every unhealthy dependency.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/example_com_taskflow_internal_transport_httpapi_dto.HealthResponse'
+      summary: Readiness probe
+      tags:
+      - Health
+schemes:
+- http
+swagger: "2.0"

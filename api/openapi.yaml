@@ -1,0 +1,635 @@
+# OpenAPI 3.0 contract for the taskflow HTTP API.
+#
+# This hand-maintained file is the client-facing contract. The same operations
+# are also described in handler annotations and generated into
+# docs/swagger/swagger.json by `make docs`; that generated document powers the
+# live Swagger UI at /swagger/index.html.
+openapi: 3.0.3
+
+info:
+  title: Taskflow API
+  version: 1.0.0
+  description: |
+    A verbose Go service demonstrating PostgreSQL, MongoDB, and Redis together.
+
+    - Tasks are stored in PostgreSQL schema `taskflow`.
+    - Notes and task audit events are stored in MongoDB database `taskflow`.
+    - Task reads are cached in Redis, and the overview view counter is atomic.
+    - Every success response wraps its payload in `data`.
+    - Every error uses a stable `error.code` plus `error.message`.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Tasks
+    description: PostgreSQL-backed task CRUD
+  - name: Notes
+    description: MongoDB-backed note CRUD
+  - name: Overview
+    description: One request that reads PostgreSQL, MongoDB, and Redis
+  - name: Health
+    description: Liveness and readiness probes
+
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: getLiveness
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      operationId: getReadiness
+      description: Pings PostgreSQL, MongoDB, and Redis. Returns 503 with concrete dependency errors when any store is unavailable.
+      responses:
+        '200':
+          description: All dependencies are reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: At least one dependency is unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      operationId: listTasks
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PriorityFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      operationId: createTask
+      description: Writes PostgreSQL, caches the task in Redis, and appends an audit event to MongoDB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created
+          headers:
+            Location:
+              description: URL of the new task
+              schema:
+                type: string
+                example: /api/v1/tasks/4f4c0f4e-6b1a-4e2f-9c3d-2a1b0c9d8e7f
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskID'
+    get:
+      tags: [Tasks]
+      summary: Get one task
+      operationId: getTask
+      description: Reads through Redis first and falls back to PostgreSQL on a cache miss or Redis failure.
+      responses:
+        '200':
+          description: The requested task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Tasks]
+      summary: Partially update a task
+      operationId: updateTask
+      description: Only supplied fields change. Updating refreshes Redis and appends a MongoDB audit event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      operationId: deleteTask
+      responses:
+        '204':
+          description: Task deleted; no body is returned
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tasks/{id}/overview:
+    parameters:
+      - $ref: '#/components/parameters/TaskID'
+    get:
+      tags: [Overview]
+      summary: Cross-database task overview
+      operationId: getTaskOverview
+      description: |
+        The single endpoint that intentionally touches all three stores:
+
+        1. PostgreSQL (through Redis) for the authoritative task;
+        2. MongoDB for attached notes and their count;
+        3. Redis for the atomic overview view counter.
+      responses:
+        '200':
+          description: Aggregated overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/notes:
+    get:
+      tags: [Notes]
+      summary: List notes
+      operationId: listNotes
+      parameters:
+        - name: task_id
+          in: query
+          description: Only notes attached to this task UUID
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [Notes]
+      summary: Create a note
+      operationId: createNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteRequest'
+      responses:
+        '201':
+          description: Note created in MongoDB
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/notes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Note UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Notes]
+      summary: Get one note
+      operationId: getNote
+      responses:
+        '200':
+          description: The requested note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Notes]
+      summary: Partially update a note
+      operationId: updateNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNoteRequest'
+      responses:
+        '200':
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Notes]
+      summary: Delete a note
+      operationId: deleteNote
+      responses:
+        '204':
+          description: Note deleted; no body is returned
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    TaskID:
+      name: id
+      in: path
+      required: true
+      description: Task UUID
+      schema:
+        type: string
+        format: uuid
+    StatusFilter:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/Status'
+    PriorityFilter:
+      name: priority
+      in: query
+      schema:
+        $ref: '#/components/schemas/Priority'
+    Limit:
+      name: limit
+      in: query
+      description: Page size. Defaults to 20 and is capped at 100.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  responses:
+    ValidationError:
+      description: The request body or query parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: validation_error
+              message: 'title: is required'
+    NotFound:
+      description: The requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: not_found
+              message: the requested task does not exist
+
+  schemas:
+    Status:
+      type: string
+      enum: [todo, in_progress, done]
+    Priority:
+      type: string
+      enum: [low, medium, high]
+
+    Task:
+      type: object
+      required: [id, title, description, status, priority, is_overdue, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        status:
+          $ref: '#/components/schemas/Status'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Absolute deadline normalized to UTC.
+        due_date_human:
+          type: string
+          description: Relative description such as "in 3 days", computed per request.
+          example: in 3 days
+        due_week:
+          type: string
+          description: ISO-8601 week of the deadline.
+          example: 2026-W53
+        is_overdue:
+          type: boolean
+        days_until_due:
+          type: integer
+          description: Calendar days between today and the deadline (negative when overdue).
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    TaskResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Task'
+
+    TaskListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        priority:
+          $ref: '#/components/schemas/Priority'
+        due_date:
+          type: string
+          description: ISO date, RFC3339 timestamp, or flexible format such as 31/12/2026.
+          example: 2026-12-31
+        timezone:
+          type: string
+          description: IANA timezone used to interpret a date-only value.
+          example: Asia/Karachi
+
+    UpdateTaskRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        status:
+          $ref: '#/components/schemas/Status'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        due_date:
+          type: string
+          nullable: true
+        clear_due_date:
+          type: boolean
+        timezone:
+          type: string
+
+    Note:
+      type: object
+      required: [id, author, body, tags, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+          format: uuid
+        author:
+          type: string
+          maxLength: 100
+        body:
+          type: string
+          maxLength: 5000
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    NoteResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Note'
+
+    NoteListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    CreateNoteRequest:
+      type: object
+      required: [body]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        author:
+          type: string
+          maxLength: 100
+        body:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+
+    UpdateNoteRequest:
+      type: object
+      minProperties: 1
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        author:
+          type: string
+          maxLength: 100
+        body:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+
+    OverviewEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/OverviewResponse'
+
+    OverviewResponse:
+      type: object
+      required: [task, notes_count, recent_notes, view_count, week_label, generated_at, sources]
+      properties:
+        task:
+          $ref: '#/components/schemas/Task'
+        notes_count:
+          type: integer
+        recent_notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+        view_count:
+          type: integer
+          description: Redis atomic counter for this overview endpoint.
+        week_label:
+          type: string
+          example: 2026-W43
+        generated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          items:
+            type: string
+          example: [postgresql, mongodb, redis]
+
+    ListMeta:
+      type: object
+      required: [limit, offset, count]
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        count:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: not_found
+            message:
+              type: string
+
+    HealthResponse:
+      type: object
+      required: [status, service, time]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: taskflow
+        time:
+          type: string
+          format: date-time
+        environment:
+          type: string
+        dependencies:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DependencyHealth'
+
+    DependencyHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        error:
+          type: string
+        latency_ms:
+          type: number

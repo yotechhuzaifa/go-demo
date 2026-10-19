@@ -1,0 +1,29 @@
+# Files Git should ignore for this project.
+
+# Compiled binaries and build output.
+/bin/
+/coverage.out
+/coverage.html
+
+# Local environment files can contain machine-specific settings or secrets.
+.env
+.env.*
+!.env.example
+configs/local.env
+*.local.env
+
+# Go tooling caches and generated test output.
+*.test
+*.prof
+
+# Editor and IDE state.
+.idea/
+.vscode/
+*.swp
+
+# Operating-system files.
+.DS_Store
+Thumbs.db
+
+# Logs produced by local runs.
+*.log

@@ -1,0 +1,29 @@
+# Files excluded from the Docker build context.
+# Keeping the context small makes builds faster and avoids leaking local state.
+
+# Git metadata and editor settings are not needed to compile.
+.git
+.gitignore
+.idea
+.vscode
+
+# Local configuration may contain secrets; runtime env vars are used instead.
+.env
+.env.*
+!.env.example
+configs/local.env
+*.env.local
+
+# Build outputs and test artifacts are recreated inside the image.
+bin/
+coverage.out
+coverage.html
+
+# Markdown and screenshots do not affect the binary, but docs/swagger is a Go
+# package imported by the router, so the docs directory must stay in context.
+*.md
+
+# Local operating-system noise.
+.DS_Store
+Thumbs.db
+*.log

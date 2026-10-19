@@ -72,3 +72,9 @@ docker-build: ## Build the container image.
 
 clean: ## Remove build and coverage artifacts.
 	rm -rf $(BIN_DIR) coverage.out coverage.html
+
+encrypt-env:
+	gpg -c --cipher-algo AES256 .env
+	
+decrypt-env:
+	gpg -o .env -d .env.gpg

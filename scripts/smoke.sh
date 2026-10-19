@@ -28,6 +28,15 @@ if ! command -v curl >/dev/null 2>&1; then
     exit 1
 fi
 
+# Fail early with an actionable message if the server is not running. Without
+# this check the first curl fails with a bare "connection refused".
+if ! curl --silent --show-error --fail --max-time 5 "${BASE_URL}/healthz" >/dev/null 2>&1; then
+    echo "error: no taskflow server answering at ${BASE_URL}" >&2
+    echo "       start it in another terminal:  make run" >&2
+    echo "       or point the script elsewhere: BASE_URL=http://host:port make smoke" >&2
+    exit 1
+fi
+
 # Pretty-print JSON when python3 happens to be available; otherwise show the
 # compact response. Output formatting must never fail the test.
 pretty() {

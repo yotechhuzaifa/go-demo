@@ -214,6 +214,31 @@ with an intentionally wrong address:
 REDIS_ADDR=127.0.0.1:1 HTTP_ADDR=:8081 make run
 ```
 
+## Logging
+
+Everything is logged with `log/slog` and a `*slog.Logger` that is passed
+explicitly (no global logger, so tests can discard output).
+
+| Format   | Rendered by                                    | Use                                    |
+| -------- | ---------------------------------------------- | -------------------------------------- |
+| `text`   | `github.com/lmittmann/tint` (slog handler)     | Local development, colorized and compact |
+| `json`   | `slog.JSONHandler`                             | Production, machine-readable            |
+
+The text format prints one compact line per record:
+
+```
+Oct 19 20:33:17.363 INF step 1/9: configuration loaded service=taskflow env=development addr=:8080
+```
+
+- the level is a colored badge: `DBG` cyan, `INF` green, `WRN` yellow, `ERR` red;
+- the timestamp and the attribute keys are dimmed, the values are normal;
+- error values are printed in red, so a failure stands out in a wall of text.
+
+Colors are only written when the output is a terminal (`LOG_COLOR=auto`, the
+default). `LOG_COLOR=always` forces them, `LOG_COLOR=never` disables them, and
+piping the output to a file or a container log collector keeps it free of escape
+sequences. The `json` format never contains colors.
+
 ## Automated API documentation
 
 Two artifacts serve different purposes:
@@ -270,7 +295,7 @@ cluster are never modified.
 │   ├── platform/
 │   │   ├── dates/                 # Flexible parsing + calendar math
 │   │   ├── health/                # Dependency readiness checks
-│   │   ├── logger/                # slog setup
+│   │   ├── logger/                # colorized slog setup
 │   │   ├── redact/                # Password-safe URL logging
 │   │   └── retryx/                # retry-go wrapper with visible logs
 │   ├── storage/
@@ -307,6 +332,7 @@ environment variables. Shell/container variables win over the file.
 | `SHUTDOWN_TIMEOUT`         | `10s`         | Graceful drain deadline                                             |
 | `LOG_LEVEL`                | `info`        | `debug`, `info`, `warn`, `error`                                    |
 | `LOG_FORMAT`               | `text`        | `text` or `json`                                                    |
+| `LOG_COLOR`                | `auto`        | `auto`, `always`, or `never` (text format only)                     |
 | `POSTGRES_URL`             | required      | PostgreSQL connection string                                        |
 | `POSTGRES_SCHEMA`          | `taskflow`    | Schema owned by the project (bundled migration supports `taskflow`) |
 | `MONGO_URI`                | required      | MongoDB connection string                                           |

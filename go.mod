@@ -24,6 +24,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
+	github.com/lmittmann/tint v1.2.1
 	github.com/pressly/goose/v3 v3.24.1
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/swaggo/http-swagger/v2 v2.0.2

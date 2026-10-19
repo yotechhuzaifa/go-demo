@@ -69,12 +69,14 @@ func run() error {
 		return fmt.Errorf("load configuration: %w", err)
 	}
 
-	log := logger.New(cfg.LogLevel, cfg.LogFormat)
+	log := logger.New(cfg.LogLevel, cfg.LogFormat, cfg.LogColor)
 	log.Info("step 1/9: configuration loaded",
 		"version", version,
 		"env", cfg.Env,
 		"addr", cfg.HTTPAddr,
 		"log_level", cfg.LogLevel,
+		"log_format", cfg.LogFormat,
+		"log_color", cfg.LogColor,
 		"postgres_schema", cfg.PostgresSchema,
 		"mongo_database", cfg.MongoDatabase,
 		"redis_addr", cfg.RedisAddr,

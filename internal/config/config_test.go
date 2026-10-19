@@ -17,6 +17,7 @@ var environmentKeys = []string{
 	envShutdownTimeout,
 	envLogLevel,
 	envLogFormat,
+	envLogColor,
 	envPostgresURL,
 	envPostgresSchema,
 	envMongoURI,
@@ -78,6 +79,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogFormat != "text" {
 		t.Errorf("LogFormat = %q, want %q", cfg.LogFormat, "text")
 	}
+	if cfg.LogColor != "auto" {
+		t.Errorf("LogColor = %q, want %q", cfg.LogColor, "auto")
+	}
 	if cfg.PostgresSchema != "taskflow" {
 		t.Errorf("PostgresSchema = %q, want %q", cfg.PostgresSchema, "taskflow")
 	}
@@ -107,6 +111,7 @@ func TestLoadOverridesFromEnvironment(t *testing.T) {
 	t.Setenv(envShutdownTimeout, "6s")
 	t.Setenv(envLogLevel, "DEBUG") // Should be normalized to lowercase.
 	t.Setenv(envLogFormat, "JSON")
+	t.Setenv(envLogColor, "ALWAYS")
 
 	cfg, err := Load()
 	if err != nil {
@@ -131,6 +136,9 @@ func TestLoadOverridesFromEnvironment(t *testing.T) {
 	if cfg.LogFormat != "json" {
 		t.Errorf("LogFormat = %q, want normalized %q", cfg.LogFormat, "json")
 	}
+	if cfg.LogColor != "always" {
+		t.Errorf("LogColor = %q, want normalized %q", cfg.LogColor, "always")
+	}
 }
 
 func TestLoadRejectsInvalidValues(t *testing.T) {
@@ -143,6 +151,7 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"zero duration", envWriteTimeout, "0s"},
 		{"bad log level", envLogLevel, "verbose"},
 		{"bad log format", envLogFormat, "xml"},
+		{"bad log color", envLogColor, "rainbow"},
 		{"bad postgres schema", envPostgresSchema, "taskflow; drop table tasks"},
 		{"zero connect attempts", envDBConnectAttempts, "0"},
 		{"bad boolean", envAutoMigrate, "sometimes"},

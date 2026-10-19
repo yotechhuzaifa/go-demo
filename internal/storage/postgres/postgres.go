@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -191,10 +192,12 @@ type gooseLogger struct {
 
 // Printf implements goose.Logger.
 func (l gooseLogger) Printf(format string, args ...any) {
-	l.logger.Info(fmt.Sprintf(format, args...))
+	// goose ends its messages with a newline. The log handler adds its own, so
+	// the trailing newline is removed to keep every log line on one row.
+	l.logger.Info(strings.TrimRight(fmt.Sprintf(format, args...), "\r\n"))
 }
 
 // Fatalf implements goose.Logger without terminating the process.
 func (l gooseLogger) Fatalf(format string, args ...any) {
-	l.logger.Error(fmt.Sprintf(format, args...))
+	l.logger.Error(strings.TrimRight(fmt.Sprintf(format, args...), "\r\n"))
 }

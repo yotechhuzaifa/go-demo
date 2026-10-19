@@ -22,7 +22,7 @@ help: ## Show this help text.
 
 run: ## Run the API locally, loading .env when present (auto-migrates and seeds).
 	@set -a; \
-	if [ -f "$(ENV_FILE)" ]; then . "$(ENV_FILE)"; fi; \
+	if [ -f "$(ENV_FILE)" ]; then . "./$(ENV_FILE)"; fi; \
 	set +a; \
 	go run $(CMD_PATH)
 

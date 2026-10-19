@@ -36,6 +36,7 @@ type Config struct {
 	// Logging ----------------------------------------------------------------
 	LogLevel  string // debug, info, warn, or error.
 	LogFormat string // "text" for humans, "json" for machines.
+	LogColor  string // "auto", "always", or "never". Colors only apply to text.
 
 	// PostgreSQL -------------------------------------------------------------
 	PostgresURL    string // Full connection string.
@@ -77,6 +78,7 @@ const (
 	envShutdownTimeout   = "SHUTDOWN_TIMEOUT"
 	envLogLevel          = "LOG_LEVEL"
 	envLogFormat         = "LOG_FORMAT"
+	envLogColor          = "LOG_COLOR"
 
 	envPostgresURL    = "POSTGRES_URL"
 	envPostgresSchema = "POSTGRES_SCHEMA"
@@ -149,6 +151,7 @@ func Load() (Config, error) {
 		ShutdownTimeout:   10 * time.Second,
 		LogLevel:          getEnv(envLogLevel, "info"),
 		LogFormat:         getEnv(envLogFormat, "text"),
+		LogColor:          getEnv(envLogColor, "auto"),
 
 		PostgresURL:    getEnv(envPostgresURL, ""),
 		PostgresSchema: getEnv(envPostgresSchema, "taskflow"),
@@ -231,6 +234,7 @@ func Load() (Config, error) {
 	// Normalize values that are effectively case-insensitive.
 	cfg.LogLevel = strings.ToLower(cfg.LogLevel)
 	cfg.LogFormat = strings.ToLower(cfg.LogFormat)
+	cfg.LogColor = strings.ToLower(strings.TrimSpace(cfg.LogColor))
 	cfg.PostgresSchema = strings.TrimSpace(cfg.PostgresSchema)
 	cfg.MongoDatabase = strings.TrimSpace(cfg.MongoDatabase)
 
@@ -281,6 +285,13 @@ func (c Config) validate() error {
 		// Both formats are supported by log/slog.
 	default:
 		return fmt.Errorf("%s must be either text or json", envLogFormat)
+	}
+
+	switch c.LogColor {
+	case "auto", "always", "never":
+		// Supported by the logger package. Colors only affect the text format.
+	default:
+		return fmt.Errorf("%s must be one of auto, always, or never", envLogColor)
 	}
 
 	// Dependency endpoints are required. Empty values usually mean the wrong

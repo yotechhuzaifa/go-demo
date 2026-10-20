@@ -29,10 +29,18 @@ import (
 	"example.com/taskflow/migrations"
 )
 
+// Schema is the PostgreSQL schema this project owns.
+//
+// The value is a constant, not a setting. The bundled migration creates and
+// schema-qualifies every object with this name, so the schema name and the
+// migration have to change together. Exposing it as configuration would
+// imply that any value works, which it does not: a different schema would
+// need a matching migration.
+const Schema = "taskflow"
+
 // DB wraps the connection pool and the settings shared by repositories.
 type DB struct {
 	Pool   *pgxpool.Pool
-	Schema string
 	Logger *slog.Logger
 }
 
@@ -45,7 +53,6 @@ type DB struct {
 func Connect(
 	ctx context.Context,
 	databaseURL string,
-	schema string,
 	attempts int,
 	retryDelay time.Duration,
 	logger *slog.Logger,
@@ -56,7 +63,7 @@ func Connect(
 
 	logger.Info("postgres: connecting",
 		"target", redact.URL(databaseURL),
-		"schema", schema,
+		"schema", Schema,
 		"attempts", attempts,
 	)
 
@@ -111,7 +118,7 @@ func Connect(
 		"max_connections", 10,
 	)
 
-	return &DB{Pool: pool, Schema: schema, Logger: logger}, nil
+	return &DB{Pool: pool, Logger: logger}, nil
 }
 
 // Migrate applies embedded goose migrations.
@@ -167,6 +174,18 @@ func (db *DB) Ping(ctx context.Context) error {
 	return db.Pool.Ping(ctx)
 }
 
+// log returns the database logger.
+//
+// A DB value built without Connect has no logger, and calling a method on a
+// nil *slog.Logger panics. Falling back to the default logger keeps the
+// cleanup paths safe.
+func (db *DB) log() *slog.Logger {
+	if db == nil || db.Logger == nil {
+		return slog.Default()
+	}
+	return db.Logger
+}
+
 // Close releases every pooled connection.
 //
 // Close is called during graceful shutdown. It does not return an error in
@@ -176,16 +195,25 @@ func (db *DB) Close() {
 	if db == nil || db.Pool == nil {
 		return
 	}
-	db.Logger.Info("postgres: closing connection pool")
+	db.log().Info("postgres: closing connection pool")
 	db.Pool.Close()
-	db.Logger.Info("postgres: connection pool closed")
+	db.log().Info("postgres: connection pool closed")
 }
 
 // gooseLogger adapts goose's Printf-style logger to slog.
 //
-// goose's Fatalf normally exits the process. In a server we want the error to
-// propagate to the caller so deferred cleanup (closing pools, flushing logs)
-// still runs, so Fatalf logs at error level and does not exit.
+// goose's Logger interface has two methods. Printf carries the progress
+// messages, and Fatalf carries the fatal ones.
+//
+// Previous version, kept for comparison. The comment claimed that goose's
+// Fatalf "normally exits the process" and that overriding it lets the error
+// propagate to the caller. That is not what happens: goose's UpContext
+// returns an error instead of calling Fatalf, and Fatalf is only used by
+// goose's command-line helpers, which this application never calls.
+//
+// Fatalf is still overridden, because a server must not exit the process from
+// inside a library call: it logs the message and returns, and the caller
+// keeps control.
 type gooseLogger struct {
 	logger *slog.Logger
 }

@@ -45,11 +45,18 @@ func validateDTO(value any) error {
 		return err
 	}
 
-	// Report the first problem. A complete field-level list would be a larger
-	// API change; one clear message is easier to act on and matches the
-	// existing domain error shape.
-	first := validationErrors[0]
-	return fmt.Errorf("%s: %s", first.Field(), validationMessage(first))
+	// Report every failing field, not only the first one. A client that
+	// sends a body with three mistakes should not have to fix them one
+	// round trip at a time.
+	//
+	// The messages keep the historical `field: rule` shape and are joined
+	// with "; ", so a request that fails exactly one field produces the
+	// same message it always did.
+	messages := make([]string, 0, len(validationErrors))
+	for _, fieldError := range validationErrors {
+		messages = append(messages, fmt.Sprintf("%s: %s", fieldError.Field(), validationMessage(fieldError)))
+	}
+	return errors.New(strings.Join(messages, "; "))
 }
 
 // validationMessage translates validator tags into operator-friendly text.

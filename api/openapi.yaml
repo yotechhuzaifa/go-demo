@@ -529,7 +529,9 @@ components:
       properties:
         task_id:
           type: string
-          format: uuid
+          description: >-
+            UUID of the task this note belongs to. Send an empty string to
+            detach the note from its task.
         author:
           type: string
           maxLength: 100

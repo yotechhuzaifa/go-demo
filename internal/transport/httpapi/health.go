@@ -18,6 +18,10 @@ type healthHandler struct {
 
 // newHealthHandler builds the probes.
 func newHealthHandler(checker *health.Checker, env string, logger *slog.Logger) *healthHandler {
+	if logger == nil {
+		// Defensive fallback; the router always passes an explicit logger.
+		logger = slog.Default()
+	}
 	return &healthHandler{checker: checker, env: env, logger: logger}
 }
 

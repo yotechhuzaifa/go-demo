@@ -12,6 +12,16 @@ import (
 // request. This protects memory and is a cheap defense against abusive clients.
 const maxRequestBodyBytes = 1 << 20 // 1 MiB
 
+// statusClientClosedRequest is the non-standard 499 status used by nginx for
+// "the client closed the request before the server replied".
+//
+// net/http has no constant for it. It is used when the request context was
+// canceled: there is nobody left to read the response, but the status still
+// has to be written, because a handler that returns without writing anything
+// makes net/http send "200 OK" with an empty body. Reporting 200 for a
+// request that failed would make the access log lie.
+const statusClientClosedRequest = 499
+
 // envelope is the consistent success shape for single resources:
 //
 //	{"data": {...}}

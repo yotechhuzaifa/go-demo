@@ -39,8 +39,7 @@ type Config struct {
 	LogColor  string // "auto", "always", or "never". Colors only apply to text.
 
 	// PostgreSQL -------------------------------------------------------------
-	PostgresURL    string // Full connection string.
-	PostgresSchema string // Dedicated schema owned by this project.
+	PostgresURL string // Full connection string.
 
 	// MongoDB ----------------------------------------------------------------
 	MongoURI            string        // mongodb:// or mongodb+srv:// connection string.
@@ -80,8 +79,7 @@ const (
 	envLogFormat         = "LOG_FORMAT"
 	envLogColor          = "LOG_COLOR"
 
-	envPostgresURL    = "POSTGRES_URL"
-	envPostgresSchema = "POSTGRES_SCHEMA"
+	envPostgresURL = "POSTGRES_URL"
 
 	envMongoURI            = "MONGO_URI"
 	envMongoDatabase       = "MONGO_DATABASE"
@@ -153,8 +151,7 @@ func Load() (Config, error) {
 		LogFormat:         getEnv(envLogFormat, "text"),
 		LogColor:          getEnv(envLogColor, "auto"),
 
-		PostgresURL:    getEnv(envPostgresURL, ""),
-		PostgresSchema: getEnv(envPostgresSchema, "taskflow"),
+		PostgresURL: getEnv(envPostgresURL, ""),
 
 		MongoURI:            getEnv(envMongoURI, ""),
 		MongoDatabase:       getEnv(envMongoDatabase, "taskflow"),
@@ -235,7 +232,6 @@ func Load() (Config, error) {
 	cfg.LogLevel = strings.ToLower(cfg.LogLevel)
 	cfg.LogFormat = strings.ToLower(cfg.LogFormat)
 	cfg.LogColor = strings.ToLower(strings.TrimSpace(cfg.LogColor))
-	cfg.PostgresSchema = strings.TrimSpace(cfg.PostgresSchema)
 	cfg.MongoDatabase = strings.TrimSpace(cfg.MongoDatabase)
 
 	if err := cfg.validate(); err != nil {
@@ -307,18 +303,11 @@ func (c Config) validate() error {
 		return fmt.Errorf("%s must be set (copy .env.example to .env)", envRedisAddr)
 	}
 
-	// A PostgreSQL schema becomes part of SQL identifiers, so restrict it to
-	// characters that cannot escape an identifier. This is a cheap, effective
-	// guard against accidental injection through configuration.
-	if !validIdentifier(c.PostgresSchema) {
-		return fmt.Errorf("%s must be a simple SQL identifier (letters, digits, underscore)", envPostgresSchema)
-	}
-	// The bundled goose migration qualifies its objects with `taskflow`.
-	// Supporting another schema means shipping a matching migration, so fail
-	// fast instead of letting the first query discover the mismatch.
-	if c.PostgresSchema != "taskflow" {
-		return fmt.Errorf("%s=%q is not supported by the bundled migration; use \"taskflow\" or add a matching migration", envPostgresSchema, c.PostgresSchema)
-	}
+	// The PostgreSQL schema is not configurable. The bundled migration owns
+	// the `taskflow` schema, and the schema name and the migration have to
+	// change together. A setting with exactly one legal value is worse than
+	// no setting at all, so the schema lives with the code that owns it
+	// (postgres.Schema).
 	if !validIdentifier(c.MongoDatabase) {
 		return fmt.Errorf("%s must contain only letters, digits, or underscores", envMongoDatabase)
 	}

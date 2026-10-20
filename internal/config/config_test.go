@@ -19,7 +19,6 @@ var environmentKeys = []string{
 	envLogFormat,
 	envLogColor,
 	envPostgresURL,
-	envPostgresSchema,
 	envMongoURI,
 	envMongoDatabase,
 	envMongoConnectTimeout,
@@ -81,9 +80,6 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.LogColor != "auto" {
 		t.Errorf("LogColor = %q, want %q", cfg.LogColor, "auto")
-	}
-	if cfg.PostgresSchema != "taskflow" {
-		t.Errorf("PostgresSchema = %q, want %q", cfg.PostgresSchema, "taskflow")
 	}
 	if cfg.MongoDatabase != "taskflow" {
 		t.Errorf("MongoDatabase = %q, want %q", cfg.MongoDatabase, "taskflow")
@@ -152,7 +148,6 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"bad log level", envLogLevel, "verbose"},
 		{"bad log format", envLogFormat, "xml"},
 		{"bad log color", envLogColor, "rainbow"},
-		{"bad postgres schema", envPostgresSchema, "taskflow; drop table tasks"},
 		{"zero connect attempts", envDBConnectAttempts, "0"},
 		{"bad boolean", envAutoMigrate, "sometimes"},
 	}

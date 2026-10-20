@@ -106,21 +106,13 @@ func seedDemoData(
 		)
 	}
 
-	if len(createdTasks) == 0 {
-		return nil
-	}
-
 	// Attach notes to the first task so the overview endpoint has MongoDB data.
+	//
+	// There is no need to check for existing notes here. The task was just
+	// created with a fresh UUID, so it cannot have any notes yet. The
+	// idempotency of the seed is decided by the task check at the top of
+	// this function.
 	primaryTaskID := createdTasks[0].ID
-	existingNotes, err := notes.CountByTask(ctx, primaryTaskID)
-	if err != nil {
-		return fmt.Errorf("check existing notes: %w", err)
-	}
-	if existingNotes > 0 {
-		logger.Info("seed: notes already exist; skipping demo notes",
-			"task_id", primaryTaskID, "count", existingNotes)
-		return nil
-	}
 
 	noteSamples := []note.CreateInput{
 		{

@@ -19,6 +19,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/lmittmann/tint"
@@ -36,11 +37,11 @@ const (
 
 // ANSI color codes used by the text handler. They are the standard SGR
 // parameters: 30-37 are the normal foreground colors, 90-97 the bright ones.
+//
+// Only the error color is set here. The level badge is colored by tint
+// itself, so the handler does not need its own level colors.
 const (
-	colorBrightRed    uint8 = 9
-	colorBrightGreen  uint8 = 10
-	colorBrightYellow uint8 = 11
-	colorBrightCyan   uint8 = 14
+	colorBrightRed uint8 = 9
 )
 
 // New creates a structured logger that writes to standard output.
@@ -123,41 +124,51 @@ func isTerminal(file *os.File) bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-// highlight paints the level and error values so a log line can be scanned
-// at a glance: the level keeps its own color, errors turn red, and every
-// other attribute is passed through untouched.
+// highlight paints error values so a log line can be scanned at a glance:
+// the error turns red and every other attribute is passed through untouched.
+//
+// Previous version, kept for comparison. The function also recolored the
+// level badge:
+//
+//	if len(groups) == 0 && attr.Key == slog.LevelKey {
+//		if level, ok := attr.Value.Any().(slog.Level); ok {
+//			return tint.Attr(levelColor(level), attr)
+//		}
+//	}
+//
+// That was re-implementing what tint already does. tint colors the level
+// badge itself: INFO green, WARN yellow, ERROR red. The version below leaves
+// the level to tint and only handles the error value.
 func highlight(groups []string, attr slog.Attr) slog.Attr {
-	if len(groups) == 0 && attr.Key == slog.LevelKey {
-		if level, ok := attr.Value.Any().(slog.Level); ok {
-			return tint.Attr(levelColor(level), attr)
-		}
-	}
-
 	if attr.Value.Kind() == slog.KindAny {
-		if err, ok := attr.Value.Any().(error); ok && err != nil {
+		if err, ok := attr.Value.Any().(error); ok && !isNilError(err) {
 			return tint.Attr(colorBrightRed, slog.Any(attr.Key, err))
 		}
 	}
 	return attr
 }
 
-// levelColor maps a log level to the color of its level badge.
-func levelColor(level slog.Level) uint8 {
-	switch {
-	case level < slog.LevelInfo:
-		return colorBrightCyan
-	case level < slog.LevelWarn:
-		return colorBrightGreen
-	case level < slog.LevelError:
-		return colorBrightYellow
+// isNilError reports whether err carries no error at all.
+//
+// A nil pointer stored in an error interface is not equal to nil, so the
+// plain `err != nil` check would treat a typed nil as a real error and paint
+// it red. The reflection check finds the nil underneath the interface.
+func isNilError(err error) bool {
+	if err == nil {
+		return true
+	}
+	value := reflect.ValueOf(err)
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
+		return value.IsNil()
 	default:
-		return colorBrightRed
+		return false
 	}
 }
 
 // parseLevel converts a configuration string into a slog.Level.
 func parseLevel(level string) slog.Level {
-	switch strings.ToLower(level) {
+	switch strings.ToLower(strings.TrimSpace(level)) {
 	case "debug":
 		return slog.LevelDebug
 	case "warn":

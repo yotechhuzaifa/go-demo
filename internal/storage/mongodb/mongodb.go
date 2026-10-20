@@ -13,6 +13,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -32,6 +33,10 @@ const (
 	CollectionNotes      = "notes"
 	CollectionTaskEvents = "task_events"
 )
+
+// defaultConnectTimeout is used when the caller supplies a non-positive
+// connect timeout.
+const defaultConnectTimeout = 10 * time.Second
 
 // DB wraps the MongoDB client and the database selected for this project.
 type DB struct {
@@ -56,6 +61,15 @@ func Connect(
 ) (*DB, error) {
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	// A zero timeout would make context.WithTimeout produce an
+	// already-expired context, so every attempt would fail instantly
+	// instead of waiting for the server. Fall back to a sane value.
+	if connectTimeout <= 0 {
+		logger.Warn("mongodb: invalid connect timeout; using the default",
+			"requested", connectTimeout, "default", defaultConnectTimeout)
+		connectTimeout = defaultConnectTimeout
 	}
 
 	logger.Info("mongodb: connecting",
@@ -119,22 +133,35 @@ func (db *DB) EnsureSchema(ctx context.Context) error {
 	}
 
 	start := time.Now()
-	db.Logger.Info("mongodb: ensuring collections and indexes",
+	db.log().Info("mongodb: ensuring collections and indexes",
 		"database", db.Database.Name())
 
 	for _, name := range []string{CollectionNotes, CollectionTaskEvents} {
 		err := db.Database.CreateCollection(ctx, name)
 		if err != nil {
 			// Code 48 = NamespaceExists. It is expected on every restart.
-			if commandError, ok := err.(mongo.CommandError); ok && commandError.Code == 48 {
-				db.Logger.Debug("mongodb: collection already exists", "collection", name)
+			//
+			// Previous version, kept for comparison. A bare type assertion
+			// only matches an error that is exactly a mongo.CommandError.
+			// As soon as the driver or a caller wraps the error, the
+			// assertion fails and a routine "collection already exists"
+			// turns into a fatal startup failure.
+			//
+			//	if commandError, ok := err.(mongo.CommandError); ok && commandError.Code == 48 {
+			//
+			// The version below uses errors.As, so a wrapped error is still
+			// recognized, and the driver's own HasErrorCode helper for the
+			// code comparison.
+			var commandError mongo.CommandError
+			if errors.As(err, &commandError) && commandError.HasErrorCode(48) {
+				db.log().Debug("mongodb: collection already exists", "collection", name)
 				continue
 			}
-			db.Logger.Error("mongodb: create collection failed",
+			db.log().Error("mongodb: create collection failed",
 				"collection", name, "error", err)
 			return fmt.Errorf("create collection %s: %w", name, err)
 		}
-		db.Logger.Info("mongodb: collection created", "collection", name)
+		db.log().Info("mongodb: collection created", "collection", name)
 	}
 
 	// Notes are commonly listed by task and newest first.
@@ -149,10 +176,10 @@ func (db *DB) EnsureSchema(ctx context.Context) error {
 		},
 	}
 	if _, err := db.Database.Collection(CollectionNotes).Indexes().CreateMany(ctx, noteIndexes); err != nil {
-		db.Logger.Error("mongodb: create note indexes failed", "error", err)
+		db.log().Error("mongodb: create note indexes failed", "error", err)
 		return fmt.Errorf("create note indexes: %w", err)
 	}
-	db.Logger.Info("mongodb: note indexes ready")
+	db.log().Info("mongodb: note indexes ready")
 
 	// Audit events are queried per task, usually in chronological order.
 	eventIndexes := []mongo.IndexModel{
@@ -162,15 +189,27 @@ func (db *DB) EnsureSchema(ctx context.Context) error {
 		},
 	}
 	if _, err := db.Database.Collection(CollectionTaskEvents).Indexes().CreateMany(ctx, eventIndexes); err != nil {
-		db.Logger.Error("mongodb: create event indexes failed", "error", err)
+		db.log().Error("mongodb: create event indexes failed", "error", err)
 		return fmt.Errorf("create event indexes: %w", err)
 	}
-	db.Logger.Info("mongodb: event indexes ready")
+	db.log().Info("mongodb: event indexes ready")
 
-	db.Logger.Info("mongodb: schema ready",
+	db.log().Info("mongodb: schema ready",
 		"database", db.Database.Name(),
 		"duration_ms", float64(time.Since(start).Microseconds())/1000)
 	return nil
+}
+
+// log returns the database logger.
+//
+// A DB value built without Connect has no logger, and calling a method on a
+// nil *slog.Logger panics. Falling back to the default logger keeps the
+// cleanup paths safe.
+func (db *DB) log() *slog.Logger {
+	if db == nil || db.Logger == nil {
+		return slog.Default()
+	}
+	return db.Logger
 }
 
 // Ping verifies that the client can still reach a primary.
@@ -186,10 +225,10 @@ func (db *DB) Close(ctx context.Context) {
 	if db == nil || db.Client == nil {
 		return
 	}
-	db.Logger.Info("mongodb: disconnecting")
+	db.log().Info("mongodb: disconnecting")
 	if err := db.Client.Disconnect(ctx); err != nil {
-		db.Logger.Error("mongodb: disconnect failed", "error", err)
+		db.log().Error("mongodb: disconnect failed", "error", err)
 		return
 	}
-	db.Logger.Info("mongodb: disconnected")
+	db.log().Info("mongodb: disconnected")
 }

@@ -334,7 +334,6 @@ environment variables. Shell/container variables win over the file.
 | `LOG_FORMAT`               | `text`        | `text` or `json`                                                    |
 | `LOG_COLOR`                | `auto`        | `auto`, `always`, or `never` (text format only)                     |
 | `POSTGRES_URL`             | required      | PostgreSQL connection string                                        |
-| `POSTGRES_SCHEMA`          | `taskflow`    | Schema owned by the project (bundled migration supports `taskflow`) |
 | `MONGO_URI`                | required      | MongoDB connection string                                           |
 | `MONGO_DATABASE`           | `taskflow`    | Database owned by the project                                       |
 | `MONGO_CONNECT_TIMEOUT`    | `10s`         | Server selection timeout                                            |

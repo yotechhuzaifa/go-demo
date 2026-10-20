@@ -393,13 +393,18 @@ func (h *taskHandler) respondError(w http.ResponseWriter, r *http.Request, err e
 		writeError(w, http.StatusConflict, "conflict", "a task with that identifier already exists")
 
 	case errors.Is(err, context.Canceled):
-		// The client disconnected. There is no one left to read a response, so
-		// only note the event at debug level.
+		// The client disconnected. There is no one left to read a response,
+		// but the status still has to be written: a handler that returns
+		// without writing anything makes net/http send "200 OK" with an
+		// empty body, and the access log would record a failure as a
+		// success.
 		h.logger.DebugContext(r.Context(), "request canceled by client",
 			"request_id", requestIDFromContext(r.Context()),
 			"method", r.Method,
 			"path", r.URL.Path,
 		)
+		writeError(w, statusClientClosedRequest, "client_closed_request",
+			"the client closed the request before it completed")
 
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, "timeout", "the request took too long to process")

@@ -77,7 +77,7 @@ func run() error {
 		"log_level", cfg.LogLevel,
 		"log_format", cfg.LogFormat,
 		"log_color", cfg.LogColor,
-		"postgres_schema", cfg.PostgresSchema,
+		"postgres_schema", postgres.Schema,
 		"mongo_database", cfg.MongoDatabase,
 		"redis_addr", cfg.RedisAddr,
 		"cache_ttl", cfg.CacheTTL,
@@ -96,7 +96,6 @@ func run() error {
 	postgresDB, err := postgres.Connect(
 		startupContext,
 		cfg.PostgresURL,
-		cfg.PostgresSchema,
 		cfg.DBConnectAttempts,
 		cfg.DBConnectRetryDelay,
 		log,

@@ -18,6 +18,10 @@ type noteHandler struct {
 
 // newNoteHandler constructs the handler set.
 func newNoteHandler(service *note.Service, logger *slog.Logger) *noteHandler {
+	if logger == nil {
+		// Defensive fallback; the router always passes an explicit logger.
+		logger = slog.Default()
+	}
 	return &noteHandler{service: service, logger: logger}
 }
 
@@ -221,8 +225,15 @@ func (h *noteHandler) respondError(w http.ResponseWriter, r *http.Request, err e
 		writeError(w, http.StatusConflict, "conflict", "a note with that identifier already exists")
 
 	case errors.Is(err, context.Canceled):
+		// The client disconnected. There is no one left to read a response,
+		// but the status still has to be written: a handler that returns
+		// without writing anything makes net/http send "200 OK" with an
+		// empty body, and the access log would record a failure as a
+		// success.
 		h.logger.DebugContext(r.Context(), "note request canceled by client",
 			"request_id", requestIDFromContext(r.Context()))
+		writeError(w, statusClientClosedRequest, "client_closed_request",
+			"the client closed the request before it completed")
 
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, "timeout", "the request took too long to process")

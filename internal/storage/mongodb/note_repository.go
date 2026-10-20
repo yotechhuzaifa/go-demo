@@ -25,9 +25,14 @@ var _ note.Repository = (*NoteRepository)(nil)
 
 // noteDocument is the BSON representation. Keeping it separate from note.Note
 // means storage-specific tags never leak into the domain package.
+//
+// task_id has no omitempty on purpose. Create inserts a whole document and
+// Update writes a $set map, so an omitempty tag would leave the field absent
+// on freshly created notes but present-and-empty on updated ones. The two
+// write paths must produce the same shape for the same logical value.
 type noteDocument struct {
 	ID        string    `bson:"_id"`
-	TaskID    string    `bson:"task_id,omitempty"`
+	TaskID    string    `bson:"task_id"`
 	Author    string    `bson:"author"`
 	Body      string    `bson:"body"`
 	Tags      []string  `bson:"tags"`
@@ -51,6 +56,10 @@ func NewNoteRepository(db *DB, logger *slog.Logger) *NoteRepository {
 
 // Create inserts a note.
 func (r *NoteRepository) Create(ctx context.Context, value *note.Note) error {
+	if value == nil {
+		return errors.New("mongodb: note must not be nil")
+	}
+
 	start := time.Now()
 	document := toNoteDocument(*value)
 
@@ -110,8 +119,16 @@ func (r *NoteRepository) List(ctx context.Context, filter note.Filter) ([]note.N
 		query["task_id"] = filter.TaskID
 	}
 
+	// Sort newest first, with _id as the tie-breaker. The sort has to be
+	// total: without a tie-breaker, two notes created in the same
+	// millisecond can swap places between pages, so a paginating client
+	// sees a note twice or not at all. The other adapters order by
+	// created_at DESC, id ASC for the same reason.
 	findOptions := options.Find().
-		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSort(bson.D{
+			{Key: "created_at", Value: -1},
+			{Key: "_id", Value: 1},
+		}).
 		SetSkip(int64(filter.Offset))
 	if filter.Limit > 0 {
 		findOptions.SetLimit(int64(filter.Limit))
@@ -178,6 +195,10 @@ func (r *NoteRepository) CountByTask(ctx context.Context, taskID string) (int64,
 
 // Update replaces the mutable note fields and returns the updated document.
 func (r *NoteRepository) Update(ctx context.Context, value *note.Note) error {
+	if value == nil {
+		return errors.New("mongodb: note must not be nil")
+	}
+
 	start := time.Now()
 
 	r.logger.DebugContext(ctx, "mongodb: updating note document",

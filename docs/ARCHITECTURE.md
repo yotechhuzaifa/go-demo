@@ -181,16 +181,18 @@ Computed fields are never stored, so they cannot become stale.
 
 `migrations/0001_create_tasks.sql` is embedded with `go:embed` and applied by
 goose at startup when `AUTO_MIGRATE=true`. Embedded files mean the container does
-not depend on a migrations directory at runtime.
+not depend on a migrations directory at runtime. `migrations/0002_updated_at_trigger.sql`
+follows it and changes the `updated_at` trigger so the application's own
+timestamp survives an update.
 
 The migration uses `-- +goose StatementBegin` around the PL/pgSQL trigger
 function because goose otherwise splits on the semicolons inside the
 dollar-quoted body.
 
 Objects are schema-qualified (`taskflow.tasks`) because the project's
-transaction-mode pooler rejects a `search_path` startup parameter. As a result,
-`POSTGRES_SCHEMA` is validated as `taskflow`; changing it requires a matching
-migration.
+transaction-mode pooler rejects a `search_path` startup parameter. The schema
+name is therefore not configurable: it is a constant in the `postgres` package
+(`postgres.Schema`) and it has to change together with the migration.
 
 ## API documentation generation
 

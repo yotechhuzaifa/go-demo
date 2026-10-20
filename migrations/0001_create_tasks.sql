@@ -8,8 +8,9 @@
 -- NOTE: the project's managed PostgreSQL endpoint is a transaction-mode pooler
 -- (Prisma/pgbouncer). It rejects a `search_path` startup parameter, so the
 -- migration qualifies every object with the schema explicitly instead of
--- relying on the session search_path. Changing POSTGRES_SCHEMA therefore
--- requires a matching migration.
+-- relying on the session search_path. The schema name is therefore fixed:
+-- it is a constant in the postgres package (postgres.Schema) and it has to
+-- change together with this migration.
 -- ---------------------------------------------------------------------------
 
 CREATE SCHEMA IF NOT EXISTS taskflow;
@@ -54,7 +55,15 @@ CREATE INDEX IF NOT EXISTS idx_tasks_due_date
     WHERE due_date IS NOT NULL;
 
 -- Keep updated_at accurate even when a row is changed outside the application.
--- The Go service also sets UpdatedAt; this trigger protects manual SQL.
+--
+-- The trigger stamps the row only when the writer did not supply a new
+-- updated_at of its own. The Go service always sends the timestamp it
+-- computed, so the application's value wins; a manual `UPDATE tasks SET
+-- title = 'x'` leaves updated_at untouched and gets now() instead.
+--
+-- Migration 0002 replaces this function. The version in this file stamps
+-- every update, which silently discarded the timestamp the application had
+-- already written.
 --
 -- goose splits migrations on semicolons. StatementBegin/StatementEnd tells it
 -- to treat the whole dollar-quoted function body as one statement.
@@ -78,4 +87,6 @@ CREATE TRIGGER tasks_set_updated_at
 DROP TRIGGER IF EXISTS tasks_set_updated_at ON taskflow.tasks;
 DROP FUNCTION IF EXISTS taskflow.set_updated_at();
 DROP TABLE IF EXISTS taskflow.tasks;
-DROP SCHEMA IF EXISTS taskflow;
+-- The schema itself is deliberately not dropped. `CREATE SCHEMA IF NOT EXISTS`
+-- above implies the schema may already have existed, so dropping it here
+-- could destroy objects this migration never created.

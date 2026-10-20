@@ -27,6 +27,50 @@ var _ task.Repository = (*TaskRepository)(nil)
 // the scan order drift between GetByID and List.
 const taskColumns = `id, title, description, status, priority, due_date, created_at, updated_at`
 
+// taskRow is the PostgreSQL row shape.
+//
+// The db tags are what pgx matches against the returned column names, so the
+// mapping happens by name and not by position. A query that returns the same
+// columns in a different order still scans into the right fields.
+//
+// The db tags and taskColumns must list the same columns. pgx fails loudly
+// when they disagree ("struct doesn't have corresponding row field x" or
+// "cannot find field x in returned row"), so a mismatch surfaces on the first
+// query instead of silently storing wrong values.
+//
+// status and priority are plain strings here. A named string type would have
+// to implement sql.Scanner to be scanned directly, and that would put a
+// database concern inside the domain package.
+type taskRow struct {
+	ID          string     `db:"id"`
+	Title       string     `db:"title"`
+	Description string     `db:"description"`
+	Status      string     `db:"status"`
+	Priority    string     `db:"priority"`
+	DueDate     *time.Time `db:"due_date"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
+}
+
+// toTask converts a database row into the domain entity. Timestamps are
+// forced to UTC so callers never have to reason about the session's timezone.
+func (r taskRow) toTask() task.Task {
+	value := task.Task{
+		ID:          r.ID,
+		Title:       r.Title,
+		Description: r.Description,
+		Status:      task.Status(r.Status),
+		Priority:    task.Priority(r.Priority),
+		CreatedAt:   r.CreatedAt.UTC(),
+		UpdatedAt:   r.UpdatedAt.UTC(),
+	}
+	if r.DueDate != nil {
+		due := r.DueDate.UTC()
+		value.DueDate = &due
+	}
+	return value
+}
+
 // NewTaskRepository builds the adapter.
 func NewTaskRepository(db *DB, logger *slog.Logger) *TaskRepository {
 	if db == nil || db.Pool == nil {
@@ -36,9 +80,9 @@ func NewTaskRepository(db *DB, logger *slog.Logger) *TaskRepository {
 		logger = slog.Default()
 	}
 
-	// Sanitize quotes the identifier safely, so the schema name from config
+	// Sanitize quotes the identifier safely, so the schema and table names
 	// cannot break out of SQL syntax.
-	table := pgx.Identifier{db.Schema, "tasks"}.Sanitize()
+	table := pgx.Identifier{Schema, "tasks"}.Sanitize()
 	return &TaskRepository{db: db, table: table, logger: logger}
 }
 
@@ -83,7 +127,30 @@ func (r *TaskRepository) GetByID(ctx context.Context, id string) (task.Task, err
 	r.logger.DebugContext(ctx, "postgres: executing SELECT by id",
 		"table", r.table, "task_id", id)
 
-	value, err := scanTask(r.db.Pool.QueryRow(ctx, query, id))
+	// Previous version, kept for comparison. The row was scanned by hand
+	// into a fixed list of destinations:
+	//
+	//	value, err := scanTask(r.db.Pool.QueryRow(ctx, query, id))
+	//	if err != nil {
+	//		if errors.Is(err, pgx.ErrNoRows) {
+	//			return task.Task{}, task.ErrNotFound
+	//		}
+	//	}
+	//
+	// The column order and the scan order were two separate lists that had
+	// to be kept in sync by hand. The version below lets pgx do the mapping
+	// by column name, so there is only one list.
+	rows, err := r.db.Pool.Query(ctx, query, id)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "postgres: SELECT failed",
+			"table", r.table, "task_id", id,
+			"duration_ms", durationMS(start), "error", err)
+		return task.Task{}, fmt.Errorf("select task by id: %w", err)
+	}
+
+	// CollectOneRow closes the rows itself and reports pgx.ErrNoRows when
+	// the query matched nothing.
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[taskRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			r.logger.DebugContext(ctx, "postgres: SELECT found no row",
@@ -98,7 +165,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id string) (task.Task, err
 
 	r.logger.InfoContext(ctx, "postgres: SELECT completed",
 		"table", r.table, "task_id", id, "duration_ms", durationMS(start))
-	return value, nil
+	return row.toTask(), nil
 }
 
 // List returns filtered, sorted, paginated tasks.
@@ -144,22 +211,36 @@ func (r *TaskRepository) List(ctx context.Context, filter task.Filter) ([]task.T
 			"table", r.table, "duration_ms", durationMS(start), "error", err)
 		return nil, fmt.Errorf("list tasks: %w", err)
 	}
-	defer rows.Close()
 
-	results := make([]task.Task, 0, filter.Limit)
-	for rows.Next() {
-		value, scanErr := scanTask(rows)
-		if scanErr != nil {
-			r.logger.ErrorContext(ctx, "postgres: row scan failed",
-				"table", r.table, "error", scanErr)
-			return nil, fmt.Errorf("scan task row: %w", scanErr)
-		}
-		results = append(results, value)
-	}
-	if err := rows.Err(); err != nil {
-		r.logger.ErrorContext(ctx, "postgres: row iteration failed",
+	// Previous version, kept for comparison. Every row was scanned by hand
+	// and the cursor was closed by hand:
+	//
+	//	defer rows.Close()
+	//	results := make([]task.Task, 0, filter.Limit)
+	//	for rows.Next() {
+	//		value, scanErr := scanTask(rows)
+	//		if scanErr != nil {
+	//			return nil, fmt.Errorf("scan task row: %w", scanErr)
+	//		}
+	//		results = append(results, value)
+	//	}
+	//	if err := rows.Err(); err != nil {
+	//		return nil, fmt.Errorf("iterate task rows: %w", err)
+	//	}
+	//
+	// The version below lets pgx collect the rows, close the cursor, and
+	// map the columns, so the loop disappears along with the hand-written
+	// scan list.
+	records, err := pgx.CollectRows(rows, pgx.RowToStructByName[taskRow])
+	if err != nil {
+		r.logger.ErrorContext(ctx, "postgres: row scan failed",
 			"table", r.table, "error", err)
-		return nil, fmt.Errorf("iterate task rows: %w", err)
+		return nil, fmt.Errorf("collect task rows: %w", err)
+	}
+
+	results := make([]task.Task, 0, len(records))
+	for _, record := range records {
+		results = append(results, record.toTask())
 	}
 
 	r.logger.InfoContext(ctx, "postgres: filtered SELECT completed",
@@ -237,41 +318,45 @@ func (r *TaskRepository) Delete(ctx context.Context, id string) error {
 
 // scanTask reads one row using the column order in taskColumns.
 //
-// status and priority are scanned into plain strings and converted explicitly:
-// this avoids relying on driver-specific support for named string types.
-func scanTask(row interface {
-	Scan(dest ...any) error
-}) (task.Task, error) {
-	var (
-		value    task.Task
-		status   string
-		priority string
-	)
-
-	err := row.Scan(
-		&value.ID,
-		&value.Title,
-		&value.Description,
-		&status,
-		&priority,
-		&value.DueDate,
-		&value.CreatedAt,
-		&value.UpdatedAt,
-	)
-	if err != nil {
-		return task.Task{}, err
-	}
-
-	value.Status = task.Status(status)
-	value.Priority = task.Priority(priority)
-	value.CreatedAt = value.CreatedAt.UTC()
-	value.UpdatedAt = value.UpdatedAt.UTC()
-	if value.DueDate != nil {
-		utc := value.DueDate.UTC()
-		value.DueDate = &utc
-	}
-	return value, nil
-}
+// Previous version, kept for comparison. The destinations were listed by
+// hand and had to match taskColumns position for position:
+//
+//	func scanTask(row interface {
+//		Scan(dest ...any) error
+//	}) (task.Task, error) {
+//		var (
+//			value    task.Task
+//			status   string
+//			priority string
+//		)
+//
+//		err := row.Scan(
+//			&value.ID,
+//			&value.Title,
+//			&value.Description,
+//			&status,
+//			&priority,
+//			&value.DueDate,
+//			&value.CreatedAt,
+//			&value.UpdatedAt,
+//		)
+//		if err != nil {
+//			return task.Task{}, err
+//		}
+//
+//		value.Status = task.Status(status)
+//		value.Priority = task.Priority(priority)
+//		value.CreatedAt = value.CreatedAt.UTC()
+//		value.UpdatedAt = value.UpdatedAt.UTC()
+//		if value.DueDate != nil {
+//			utc := value.DueDate.UTC()
+//			value.DueDate = &utc
+//		}
+//		return value, nil
+//	}
+//
+// The replacement is taskRow plus pgx.RowToStructByName, which maps by column
+// name and needs no list of destinations at all.
 
 // translateError maps PostgreSQL's unique-violation code to the domain
 // sentinel. Other errors keep their driver detail so logs remain useful.
